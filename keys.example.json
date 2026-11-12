@@ -1,0 +1,11 @@
+{
+  "normal": {
+    "j": "scroll-down",
+    "k": "scroll-up",
+    "<C-d>": "half-page-down",
+    "<C-u>": "half-page-up",
+    "t": "command-open",
+    "<C-w>n": "split-vertical",
+    "d": ""
+  }
+}

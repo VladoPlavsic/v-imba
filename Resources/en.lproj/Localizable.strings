@@ -1,0 +1,60 @@
+/* Fallback window title shown before a page reports one. */
+"Vimb" = "Vimb";
+
+/* Status line indicator shown while insert mode is active. */
+"-- INSERT --" = "-- INSERT --";
+
+/* Shown when the command bar input matches no known command. */
+"Not a command" = "Not a command";
+
+/* Status line indicator shown while hint mode is active. */
+"-- HINT --" = "-- HINT --";
+
+/* Menu bar titles. */
+"Edit" = "Edit";
+"Window" = "Window";
+"Hide Vimb" = "Hide Vimb";
+"Hide Others" = "Hide Others";
+"Show All" = "Show All";
+"Quit Vimb" = "Quit Vimb";
+"Undo" = "Undo";
+"Redo" = "Redo";
+"Cut" = "Cut";
+"Copy" = "Copy";
+"Paste" = "Paste";
+"Select All" = "Select All";
+"Close Window" = "Close Window";
+"Minimize" = "Minimize";
+
+/* Window menu item for native macOS full screen. */
+"Enter Full Screen" = "Enter Full Screen";
+
+/* Command bar feedback for bookmark commands. */
+"No matching bookmark" = "No matching bookmark";
+"Bookmarked" = "Bookmarked";
+"Removed" = "Removed";
+
+/* View menu. */
+"View" = "View";
+"Zoom In" = "Zoom In";
+"Zoom Out" = "Zoom Out";
+"Actual Size" = "Actual Size";
+
+/* Buttons in JavaScript dialogs. */
+"OK" = "OK";
+"Cancel" = "Cancel";
+
+/* Shown in the status line when a page fails to load. */
+"Failed" = "Failed";
+
+/* Buffer command feedback. */
+"No matching buffer" = "No matching buffer";
+"Last buffer stays open" = "Last buffer stays open";
+"Untitled" = "Untitled";
+
+/* Window command feedback. */
+"Last pane stays open" = "Last pane stays open";
+
+/* Search and pass-through feedback. */
+"Pattern not found" = "Pattern not found";
+"-- PASS THROUGH --" = "-- PASS THROUGH --";

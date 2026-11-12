@@ -1,0 +1,48 @@
+/*
+ * Overrides for vimb's hints.css, loaded after it.
+ *
+ * Two things are fixed here: vimb sizes labels with a relative `.8em`, which
+ * makes them unreadably small on pages with small text, and it replaces the
+ * hinted element's background outright, which hides the element's own text.
+ * Labels get an absolute size, and elements get a translucent wash plus an
+ * outline instead of an opaque fill.
+ */
+
+span[vimbhint^='label'] {
+    background: #ffd400 !important;
+    border: 1px solid #1a1a1a !important;
+    border-radius: 3px !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55) !important;
+    color: #000 !important;
+    -webkit-text-fill-color: #000 !important;
+    font: bold 12px/1.25 ui-monospace, Menlo, monospace !important;
+    letter-spacing: 0.5px !important;
+    opacity: 1 !important;
+    padding: 1px 4px !important;
+    text-shadow: none !important;
+    text-transform: none !important;
+    z-index: 2250000 !important;
+}
+
+span[vimbhint='label focus'] {
+    background: #16e06a !important;
+    border-color: #000 !important;
+    opacity: 1 !important;
+}
+
+*[vimbhint^='hint'] {
+    background-color: rgba(255, 212, 0, 0.35) !important;
+    outline: 2px solid #ffd400 !important;
+    outline-offset: 1px !important;
+}
+
+*[vimbhint='hint focus'] {
+    background-color: rgba(22, 224, 106, 0.4) !important;
+    outline-color: #16e06a !important;
+}
+
+/* Marks the box that j/k just scrolled, so the scroll target is visible. */
+*[vimbscroll='active'] {
+    outline: 2px solid #16e06a !important;
+    outline-offset: -2px !important;
+}
