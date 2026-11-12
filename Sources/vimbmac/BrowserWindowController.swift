@@ -457,6 +457,8 @@ final class BrowserWindowController: NSWindowController {
             }
         case .cookies(let filter):
             dumpCookies(matching: filter)
+        case .evaluate(let script):
+            report(script: script)
         case .openBookmarkInNewTab(let query):
             guard let match = resolveBookmark(query), let url = URL(string: match.url) else {
                 statusBar.leftText = L("No matching bookmark")
@@ -733,6 +735,22 @@ extension BrowserWindowController: BrowserActions, CommandActions, TabActions, P
 
     func blurPageFocus() {
         evaluate("if (window.vimbReleaseFocus) { vimbReleaseFocus(); }")
+    }
+
+    /// Evaluates an expression in the page, writing the result or error to
+    /// stderr and a short form to the status line.
+    private func report(script: String) {
+        guard !script.isEmpty else { return }
+        webView.evaluateJavaScript(script) { [weak self] result, error in
+            let outcome: String
+            if let error {
+                outcome = "error: \(error.localizedDescription)"
+            } else {
+                outcome = String(describing: result ?? "undefined")
+            }
+            FileHandle.standardError.write(Data("js> \(script)\n\(outcome)\n".utf8))
+            self?.statusBar.leftText = outcome
+        }
     }
 
     /// Writes matching cookies to stderr, with expiry, so session loss can be

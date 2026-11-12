@@ -18,13 +18,15 @@ enum Command: Equatable {
     case openBookmarkInNewTab(query: String)
     /// Diagnostic: lists stored cookies whose domain matches the filter.
     case cookies(filter: String)
+    /// Diagnostic: evaluates an expression in the page and reports the result.
+    case evaluate(script: String)
 }
 
 enum CommandParser {
     /// Every command name offered by completion, canonical spellings only.
     static let allNames = [
         "open", "quit", "tabnew", "b", "bd", "sbm", "obm", "tobm", "dbm",
-        "cookies",
+        "cookies", "js",
     ]
 
     /// Commands that take a bookmark path, and so offer path completion.
@@ -57,6 +59,8 @@ enum CommandParser {
             return .openBookmarkInNewTab(query: argument)
         case "cookies":
             return .cookies(filter: argument)
+        case "js":
+            return .evaluate(script: argument)
         case "dbm":
             return .deleteBookmark(query: argument)
         case "t", "tabnew", "tabopen":
