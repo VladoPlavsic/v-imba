@@ -139,24 +139,46 @@ extension PopupWindowController: NSWindowDelegate {
 }
 
 extension PopupWindowController: BrowserActions {
+    func yankURL() {
+        copy(webView.url?.absoluteString)
+    }
+
+    func yankPath() {
+        guard let url = webView.url,
+              var path = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        else {
+            return
+        }
+        path.scheme = nil
+        path.host = nil
+        path.port = nil
+        copy(path.string)
+    }
+
+    private func copy(_ text: String?) {
+        guard let text, !text.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
     func scrollBy(lines: Int) {
-        evaluate("vimbScroll.by(\(lines * Config.scrollStep));")
+        evaluate("vimbaScroll.by(\(lines * Config.scrollStep));")
     }
 
     func scrollBy(columns: Int) {
-        evaluate("vimbScroll.byX(\(columns * Config.scrollStep));")
+        evaluate("vimbaScroll.byX(\(columns * Config.scrollStep));")
     }
 
     func scrollBy(pages: Double) {
-        evaluate("vimbScroll.byPages(\(pages));")
+        evaluate("vimbaScroll.byPages(\(pages));")
     }
 
     func scrollToTop() {
-        evaluate("vimbScroll.toTop();")
+        evaluate("vimbaScroll.toTop();")
     }
 
     func scrollToBottom() {
-        evaluate("vimbScroll.toBottom();")
+        evaluate("vimbaScroll.toBottom();")
     }
 
     func goBack() {
@@ -184,7 +206,7 @@ extension PopupWindowController: BrowserActions {
     }
 
     func followSelection() {
-        evaluate("if (window.vimbFollowSelection) { vimbFollowSelection(); }")
+        evaluate("if (window.vimbaFollowSelection) { vimbaFollowSelection(); }")
     }
 
     func findNext() {}
@@ -192,6 +214,6 @@ extension PopupWindowController: BrowserActions {
     func findPrevious() {}
 
     func blurPageFocus() {
-        evaluate("if (window.vimbReleaseFocus) { vimbReleaseFocus(); }")
+        evaluate("if (window.vimbaReleaseFocus) { vimbaReleaseFocus(); }")
     }
 }

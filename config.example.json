@@ -1,0 +1,22 @@
+{
+  "start-page": "https://duckduckgo.com",
+  "search-engine": "https://duckduckgo.com/",
+
+  "window-chrome": "none",
+  "window-width": 1280,
+  "window-height": 800,
+
+  "scroll-step": 60,
+
+  "hint-keys": "0123456789",
+  "max-hints": 500,
+
+  "zoom-step": 1.1,
+  "zoom-min": 0.3,
+  "zoom-max": 5.0,
+
+  "content-languages": ["en-US", "en"],
+  "user-agent-suffix": "Version/18.0 Safari/605.1.15",
+
+  "tab-idle-minutes": 30
+}

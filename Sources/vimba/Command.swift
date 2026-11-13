@@ -20,13 +20,16 @@ enum Command: Equatable {
     case cookies(filter: String)
     /// Diagnostic: evaluates an expression in the page and reports the result.
     case evaluate(script: String)
+    /// Diagnostic: writes a hint-mode report to ~/.config/vimba/diag.log,
+    /// after a delay so a menu can be opened first.
+    case diagnose(delay: Double, needle: String)
 }
 
 enum CommandParser {
     /// Every command name offered by completion, canonical spellings only.
     static let allNames = [
         "open", "quit", "tabnew", "b", "bd", "sbm", "obm", "tobm", "dbm",
-        "cookies", "js",
+        "cookies", "js", "diag",
     ]
 
     /// Commands that take a bookmark path, and so offer path completion.
@@ -35,6 +38,25 @@ enum CommandParser {
 
     /// Commands that take a buffer name, and so complete against open tabs.
     static let bufferNames: Set<String> = ["b", "buffer", "bd", "bdelete"]
+
+    /// Commands that come in a "here" and a "in a new buffer" form. Shift-Enter
+    /// in the command bar swaps one for the other, so a picker can default to
+    /// a new buffer and still open in this one on demand.
+    private static let alternates: [String: String] = [
+        "open": "tabnew", "o": "tabnew", "op": "tabnew",
+        "tabnew": "open", "t": "open", "tabopen": "open",
+        "obm": "tobm",
+        "tobm": "obm", "tbm": "obm",
+    ]
+
+    /// The same line aimed at the other buffer, or unchanged when the command
+    /// has no counterpart.
+    static func swapTarget(_ line: String) -> String {
+        let parts = line.trimmingCharacters(in: .whitespaces)
+            .split(separator: " ", maxSplits: 1).map(String.init)
+        guard let name = parts.first, let other = alternates[name] else { return line }
+        return parts.count > 1 ? "\(other) \(parts[1])" : other
+    }
 
     /// Parses a command bar line such as `open example.com` or `sbm /news/bbc`.
     static func parse(_ line: String) -> Command? {
@@ -63,6 +85,18 @@ enum CommandParser {
             return .evaluate(script: argument)
         case "dbm":
             return .deleteBookmark(query: argument)
+        case "diag":
+            // A leading number is a delay in seconds; the rest is text to
+            // locate. `:diag 5 add account` waits, then reports where the
+            // words "add account" live.
+            var rest = argument
+            var delay = 0.0
+            let head = rest.split(separator: " ", maxSplits: 1).map(String.init)
+            if let first = head.first, let seconds = Double(first) {
+                delay = seconds
+                rest = head.count > 1 ? head[1] : ""
+            }
+            return .diagnose(delay: delay, needle: rest)
         case "t", "tabnew", "tabopen":
             return .newTab(target: argument)
         case "b", "buffer":

@@ -1,5 +1,5 @@
 /* Fallback window title shown before a page reports one. */
-"Vimb" = "Vimb";
+"Vimba" = "Vimba";
 
 /* Status line indicator shown while insert mode is active. */
 "-- INSERT --" = "-- INSERT --";
@@ -13,10 +13,10 @@
 /* Menu bar titles. */
 "Edit" = "Edit";
 "Window" = "Window";
-"Hide Vimb" = "Hide Vimb";
+"Hide Vimba" = "Hide Vimba";
 "Hide Others" = "Hide Others";
 "Show All" = "Show All";
-"Quit Vimb" = "Quit Vimb";
+"Quit Vimba" = "Quit Vimba";
 "Undo" = "Undo";
 "Redo" = "Redo";
 "Cut" = "Cut";
@@ -58,3 +58,15 @@
 /* Search and pass-through feedback. */
 "Pattern not found" = "Pattern not found";
 "-- PASS THROUGH --" = "-- PASS THROUGH --";
+
+/* Status line while the :diag delay runs. */
+"Diagnosing in" = "Diagnosing in";
+
+/* Status line after a diagnostic report is written. */
+"Wrote" = "Wrote";
+
+/* Status line after y copies the address. */
+"Copied" = "Copied";
+
+/* Status line when y is pressed on a page with no address. */
+"No address to copy" = "No address to copy";

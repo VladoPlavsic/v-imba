@@ -6,10 +6,10 @@
  * have no href, onclick, role or tabindex, and vimb's xpath cannot see them.
  * CSS cursor is the reliable tell, which is the heuristic Vimium uses.
  */
-function vimbMarkClickable() {
-    var previous = document.querySelectorAll("[data-vimbclick]");
+function vimbaMarkClickable() {
+    var previous = document.querySelectorAll("[data-vimbaclick]");
     for (var i = 0; i < previous.length; i++) {
-        previous[i].removeAttribute("data-vimbclick");
+        previous[i].removeAttribute("data-vimbaclick");
     }
 
     if (!document.body) {
@@ -45,7 +45,7 @@ function vimbMarkClickable() {
         // skipping descendants avoids a hint per nested span.
         var parent = el.parentElement, nested = false;
         while (parent && parent !== document.body) {
-            if (parent.hasAttribute("data-vimbclick")) {
+            if (parent.hasAttribute("data-vimbaclick")) {
                 nested = true;
                 break;
             }
@@ -55,7 +55,7 @@ function vimbMarkClickable() {
             continue;
         }
 
-        el.setAttribute("data-vimbclick", "");
+        el.setAttribute("data-vimbaclick", "");
     }
 }
 
@@ -64,7 +64,7 @@ function vimbMarkClickable() {
  * matched text. Lets `/` double as navigation: search for a link's words, then
  * press Enter to follow it.
  */
-function vimbFollowSelection() {
+function vimbaFollowSelection() {
     var selection = window.getSelection();
     if (!selection || selection.rangeCount === 0 || !selection.anchorNode) {
         return false;
@@ -77,7 +77,7 @@ function vimbFollowSelection() {
         var role = el.getAttribute && el.getAttribute("role");
         var clickable = el instanceof HTMLAnchorElement ||
             (el.hasAttribute && (el.hasAttribute("href") || el.hasAttribute("onclick") ||
-                el.hasAttribute("data-vimbclick"))) ||
+                el.hasAttribute("data-vimbaclick"))) ||
             role === "button" || role === "link" ||
             el.tagName === "BUTTON" ||
             window.getComputedStyle(el).cursor === "pointer";

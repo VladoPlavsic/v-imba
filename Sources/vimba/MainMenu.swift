@@ -24,7 +24,7 @@ enum MainMenu {
         let menu = NSMenu()
 
         menu.addItem(
-            withTitle: L("Hide Vimb"),
+            withTitle: L("Hide Vimba"),
             action: #selector(NSApplication.hide(_:)),
             keyEquivalent: "h"
         )
@@ -43,12 +43,12 @@ enum MainMenu {
         )
         menu.addItem(.separator())
         menu.addItem(
-            withTitle: L("Quit Vimb"),
+            withTitle: L("Quit Vimba"),
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         )
 
-        return wrap(menu, titled: L("Vimb"))
+        return wrap(menu, titled: L("Vimba"))
     }
 
     private static func editMenu() -> NSMenuItem {

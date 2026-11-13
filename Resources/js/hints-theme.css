@@ -1,48 +1,71 @@
 /*
- * Overrides for vimb's hints.css, loaded after it.
+ * Overrides for vimb's hints.css, loaded after it, and adopted into the
+ * shadow root that holds the labels.
  *
- * Two things are fixed here: vimb sizes labels with a relative `.8em`, which
- * makes them unreadably small on pages with small text, and it replaces the
- * hinted element's background outright, which hides the element's own text.
- * Labels get an absolute size, and elements get a translucent wash plus an
- * outline instead of an opaque fill.
+ * Three things are fixed here: vimb sizes labels with a relative `.8em`,
+ * which makes them unreadably small on pages with small text; it replaces the
+ * hinted element's background outright, which hides the element's own text;
+ * and its digits are hard to tell apart at a glance. Labels get an absolute
+ * size, a slashed zero and tabular figures so 0, 6 and 9 stay distinct, and
+ * elements get a translucent wash plus an outline instead of an opaque fill.
+ *
+ * Menlo leads the font stack deliberately: its zero is slashed, where SF Mono
+ * (what ui-monospace resolves to) draws a plain oval.
  */
 
-span[vimbhint^='label'] {
+span[vimbahint^='label'] {
     background: #ffd400 !important;
     border: 1px solid #1a1a1a !important;
-    border-radius: 3px !important;
+    border-radius: 4px !important;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55) !important;
     color: #000 !important;
     -webkit-text-fill-color: #000 !important;
-    font: bold 12px/1.25 ui-monospace, Menlo, monospace !important;
-    letter-spacing: 0.5px !important;
+    font: bold 15px/1.2 Menlo, ui-monospace, monospace !important;
+    font-variant-numeric: slashed-zero tabular-nums !important;
+    font-feature-settings: "zero" 1, "tnum" 1 !important;
+    letter-spacing: 1px !important;
     opacity: 1 !important;
-    padding: 1px 4px !important;
+    padding: 2px 5px !important;
     text-shadow: none !important;
     text-transform: none !important;
     z-index: 2250000 !important;
+    /* Set explicitly rather than inherited: a page that indents or hides its
+     * text would otherwise carry that into the label and leave an empty box. */
+    direction: ltr !important;
+    text-indent: 0 !important;
+    text-decoration: none !important;
+    visibility: visible !important;
+    white-space: nowrap !important;
+    width: auto !important;
+    height: auto !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    transform: none !important;
+    clip-path: none !important;
+    word-spacing: normal !important;
+    vertical-align: baseline !important;
+    pointer-events: none !important;
 }
 
-span[vimbhint='label focus'] {
+span[vimbahint='label focus'] {
     background: #16e06a !important;
     border-color: #000 !important;
     opacity: 1 !important;
 }
 
-*[vimbhint^='hint'] {
+*[vimbahint^='hint'] {
     background-color: rgba(255, 212, 0, 0.35) !important;
     outline: 2px solid #ffd400 !important;
     outline-offset: 1px !important;
 }
 
-*[vimbhint='hint focus'] {
+*[vimbahint='hint focus'] {
     background-color: rgba(22, 224, 106, 0.4) !important;
     outline-color: #16e06a !important;
 }
 
 /* Marks the box that j/k just scrolled, so the scroll target is visible. */
-*[vimbscroll='active'] {
+*[vimbascroll='active'] {
     outline: 2px solid #16e06a !important;
     outline-offset: -2px !important;
 }

@@ -26,6 +26,12 @@ enum KeyAction: String, CaseIterable {
     case commandOpen = "command-open"
     case commandOpenCurrent = "command-open-current"
 
+    /// Copies the current page's address to the clipboard.
+    case yankURL = "yank-url"
+    /// Copies only the path, query and fragment - the browser's answer to
+    /// vim's relative path.
+    case yankPath = "yank-path"
+
     case searchForward = "search-forward"
     case searchBackward = "search-backward"
     case searchNext = "search-next"

@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "vimbmac",
+    name: "vimba",
     platforms: [.macOS(.v14)],
     targets: [
         .executableTarget(
-            name: "vimbmac",
-            path: "Sources/vimbmac",
+            name: "vimba",
+            path: "Sources/vimba",
             swiftSettings: [.swiftLanguageMode(.v6)]
         )
     ]

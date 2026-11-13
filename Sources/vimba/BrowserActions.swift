@@ -25,6 +25,11 @@ protocol BrowserActions: AnyObject {
 
     /// Drops DOM focus and releases the scroll target.
     func blurPageFocus()
+
+    /// Copies the current address to the clipboard.
+    func yankURL()
+    /// Copies the path, query and fragment only.
+    func yankPath()
 }
 
 /// Implemented only by windows that have a command bar, so popups can take
@@ -35,10 +40,14 @@ protocol CommandActions: AnyObject {
     /// Opens the bar as a search prompt rather than a command line.
     func beginSearch(backwards: Bool)
     func beginCommandWithCurrentURL()
-    func submitCommand()
+    func submitCommand(alternate: Bool)
     func cancelCommand()
     func selectNextCompletion()
     func selectPreviousCompletion()
+
+    /// Walks back and forth through previously submitted command lines.
+    func recallPreviousCommand()
+    func recallNextCommand()
 }
 
 /// Implemented only by windows that run the hint script.
@@ -49,6 +58,13 @@ protocol HintActions: AnyObject {
     func hintDeleteKey()
     func fireHint()
     func cancelHints()
+}
+
+/// Implemented by windows that can show the which-key style key guide.
+@MainActor
+protocol KeyGuideActions: AnyObject {
+    func showKeyGuide(_ entries: [KeyGuideEntry])
+    func hideKeyGuide()
 }
 
 /// Implemented only by windows that hold buffers, so popups stay out of it.

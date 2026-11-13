@@ -11,7 +11,7 @@
  * Whatever is chosen is briefly outlined, so it is never a mystery which box
  * just scrolled.
  */
-var vimbScroll = (function () {
+var vimbaScroll = (function () {
     var pointer = {x: 0, y: 0},
         lastInteracted = null,
         flashTimer = null,
@@ -104,10 +104,10 @@ var vimbScroll = (function () {
         if (!el) {
             return;
         }
-        el.setAttribute("vimbscroll", "active");
+        el.setAttribute("vimbascroll", "active");
         window.clearTimeout(flashTimer);
         flashTimer = window.setTimeout(function () {
-            el.removeAttribute("vimbscroll");
+            el.removeAttribute("vimbascroll");
         }, 900);
     }
 
@@ -127,9 +127,9 @@ var vimbScroll = (function () {
             lastInteracted = null;
             forceWindow = true;
             window.clearTimeout(flashTimer);
-            var marked = document.querySelectorAll("[vimbscroll]");
+            var marked = document.querySelectorAll("[vimbascroll]");
             for (var i = 0; i < marked.length; i++) {
-                marked[i].removeAttribute("vimbscroll");
+                marked[i].removeAttribute("vimbascroll");
             }
         },
         by: function (dy) {
@@ -160,12 +160,12 @@ var vimbScroll = (function () {
  * synthetic Escape to the page so dropdowns and modals close. The real key
  * never reaches the page, because normal mode consumes it.
  */
-function vimbReleaseFocus() {
+function vimbaReleaseFocus() {
     if (document.activeElement && document.activeElement.blur) {
         document.activeElement.blur();
     }
-    if (window.vimbScroll) {
-        window.vimbScroll.release();
+    if (window.vimbaScroll) {
+        window.vimbaScroll.release();
     }
     document.dispatchEvent(new KeyboardEvent("keydown", {
         key: "Escape",

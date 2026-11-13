@@ -11,5 +11,5 @@ let delegate = AppDelegate()
 application.delegate = delegate
 application.setActivationPolicy(.regular)
 MainMenu.install(into: application)
-application.activate(ignoringOtherApps: true)
+// Activation happens once the window exists, in applicationDidFinishLaunching.
 application.run()

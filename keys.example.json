@@ -1,11 +1,26 @@
 {
+  "leader": "<Space>",
+
+  "groups": {
+    "<leader><leader>": "[T]abs",
+    "<leader>b": "[B]ookmarks",
+    "<leader>y": "[Y]ank",
+    "<leader>p": "[P]ath"
+  },
+
   "normal": {
     "j": "scroll-down",
     "k": "scroll-up",
     "<C-d>": "half-page-down",
     "<C-u>": "half-page-up",
+    "y": "yank-url",
+
     "t": "command-open",
     "<C-w>n": "split-vertical",
+
+    "<leader>gh": { "command": "open github.com/", "desc": "github" },
+    "<leader>gy": { "command": "open youtube.com/", "desc": "youtube" },
+
     "d": ""
   }
 }

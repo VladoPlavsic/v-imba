@@ -3,13 +3,17 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>Vimb</string>
+	<string>Vimba</string>
 	<key>CFBundleDisplayName</key>
-	<string>Vimb</string>
+	<string>Vimba</string>
 	<key>CFBundleExecutable</key>
-	<string>Vimb</string>
+	<string>Vimba</string>
 	<key>CFBundleIdentifier</key>
-	<string>local.vimbmac</string>
+	<string>local.vimba</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

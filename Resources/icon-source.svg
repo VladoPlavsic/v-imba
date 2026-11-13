@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Design source for the app icon: the wordmark in Vim's green (#019833) on a
+  white macOS-style rounded square. Text is still live here so the wording or
+  font can be changed; `make icon` flattens it to paths and rasterises it.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect x="100" y="100" width="824" height="824" rx="185" ry="185"
+        fill="#ffffff" stroke="#d6d6d6" stroke-width="4"/>
+  <text x="512" y="582"
+        font-family="Menlo, 'SF Mono', monospace" font-weight="bold"
+        font-size="194" letter-spacing="-4"
+        text-anchor="middle" fill="#019833">V-imba</text>
+</svg>

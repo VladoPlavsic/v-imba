@@ -17,6 +17,7 @@ final class InputController {
     private weak var hints: HintActions?
     private weak var tabs: TabActions?
     private weak var panes: PaneActions?
+    private weak var guide: KeyGuideActions?
     private weak var ownerWindow: NSWindow?
     private var monitor: Any?
 
@@ -30,6 +31,7 @@ final class InputController {
         hints: HintActions? = nil,
         tabs: TabActions? = nil,
         panes: PaneActions? = nil,
+        guide: KeyGuideActions? = nil,
         ownerWindow: NSWindow?,
         initialMode: Mode = .normal
     ) {
@@ -38,6 +40,7 @@ final class InputController {
         self.hints = hints
         self.tabs = tabs
         self.panes = panes
+        self.guide = guide
         self.ownerWindow = ownerWindow
         self.mode = initialMode
     }
@@ -99,7 +102,10 @@ final class InputController {
             return true
         case .command:
             if KeyCode.submitKeys.contains(event.keyCode) {
-                commands?.submitCommand()
+                // Shift-Enter submits to the other target: a bookmark picker
+                // that opens in a new buffer opens in this one instead, and
+                // the other way round.
+                commands?.submitCommand(alternate: event.modifierFlags.contains(.shift))
                 return false
             }
             if event.keyCode == KeyCode.tab {
@@ -117,6 +123,19 @@ final class InputController {
             if event.keyCode == KeyCode.upArrow {
                 commands?.selectPreviousCompletion()
                 return false
+            }
+            // Ctrl-p / Ctrl-n for history, since the arrows already cycle
+            // completions. This is what vim's command line uses too.
+            if event.modifierFlags.contains(.control),
+               let characters = event.charactersIgnoringModifiers {
+                if characters == "p" {
+                    commands?.recallPreviousCommand()
+                    return false
+                }
+                if characters == "n" {
+                    commands?.recallNextCommand()
+                    return false
+                }
             }
             // The command bar is first responder, so let it do the typing.
             return true
@@ -138,17 +157,37 @@ final class InputController {
     private func handleNormal(_ event: NSEvent) {
         guard let stroke = KeyStroke(event: event) else { return }
 
-        pendingSequence.append(stroke)
-
-        if let action = keymap.action(for: pendingSequence) {
+        // Esc abandons a half-typed sequence rather than acting on its own
+        // binding, the way it does in vim.
+        if stroke.key == "\u{1B}", !pendingSequence.isEmpty {
             pendingSequence.removeAll()
-            perform(action)
+            guide?.hideKeyGuide()
             return
         }
 
-        // Keep waiting only while the sequence could still complete a binding.
-        if !keymap.hasPrefix(pendingSequence) {
+        pendingSequence.append(stroke)
+
+        if let binding = keymap.binding(for: pendingSequence) {
             pendingSequence.removeAll()
+            guide?.hideKeyGuide()
+            switch binding {
+            case .action(let action):
+                perform(action)
+            case .command(let line):
+                guard let commands else { break }
+                commands.beginCommand(prefilled: line)
+                setMode(.command)
+            }
+            return
+        }
+
+        // Keep waiting only while the sequence could still complete a binding,
+        // and show what those keys are while waiting.
+        if keymap.hasPrefix(pendingSequence) {
+            guide?.showKeyGuide(keymap.continuations(after: pendingSequence))
+        } else {
+            pendingSequence.removeAll()
+            guide?.hideKeyGuide()
         }
     }
 
@@ -189,6 +228,10 @@ final class InputController {
             guard let commands else { break }
             commands.beginCommandWithCurrentURL()
             setMode(.command)
+        case .yankURL:
+            actions?.yankURL()
+        case .yankPath:
+            actions?.yankPath()
 
         case .searchForward:
             guard let commands else { break }
@@ -233,6 +276,11 @@ final class InputController {
     private func setMode(_ newMode: Mode) {
         guard newMode != mode else { return }
         mode = newMode
+        // The guide only ever describes normal-mode sequences.
+        if newMode != .normal {
+            pendingSequence.removeAll()
+            guide?.hideKeyGuide()
+        }
         onModeChange?(newMode)
     }
 }

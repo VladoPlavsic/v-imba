@@ -4,7 +4,7 @@ import WebKit
 /// page through a script message because evaluateJavaScript results cannot
 /// cross an actor boundary.
 final class HintsBridge: NSObject, WKScriptMessageHandler {
-    static let messageName = "vimbHints"
+    static let messageName = "vimbaHints"
 
     /// Carries the reporting web view, so a status can be routed to the
     /// window that owns it rather than always to the main one.

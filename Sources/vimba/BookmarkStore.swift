@@ -1,6 +1,6 @@
 import Foundation
 
-/// Bookmarks persisted as JSON under ~/.config/vimb-mac/.
+/// Bookmarks persisted as JSON under ~/.config/vimba/.
 @MainActor
 final class BookmarkStore {
     private(set) var bookmarks: [Bookmark] = []
@@ -10,7 +10,7 @@ final class BookmarkStore {
     init() {
         let directory = FileManager.default
             .homeDirectoryForCurrentUser
-            .appending(path: ".config/vimb-mac", directoryHint: .isDirectory)
+            .appending(path: ".config/vimba", directoryHint: .isDirectory)
         fileURL = directory.appending(path: "bookmarks.json")
         load()
     }

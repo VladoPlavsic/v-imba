@@ -19,6 +19,7 @@ final class BrowserWindowController: NSWindowController {
     private let statusBar = StatusBarView()
     private let commandBar = CommandBarView()
     private let completions = CompletionView()
+    private let keyGuide = KeyGuideView()
     private let bookmarks = BookmarkStore()
     /// Whether the completion list is currently offering command names or an
     /// argument, which decides how an accepted entry is written back.
@@ -35,6 +36,8 @@ final class BrowserWindowController: NSWindowController {
     private var popups: [PopupWindowController] = []
     private var input: InputController?
     private let hintsBridge = HintsBridge()
+    private let frames = FrameRegistry.shared
+    private let history = CommandHistory()
     private var progressObservation: NSKeyValueObservation?
     private var loadingObservation: NSKeyValueObservation?
     /// Set on navigation failure and cleared on the next load, so a mistyped
@@ -54,6 +57,7 @@ final class BrowserWindowController: NSWindowController {
             contentController.addUserScript(hintsScript)
         }
         contentController.add(hintsBridge, name: HintsBridge.messageName)
+        contentController.add(frames, name: FrameRegistry.messageName)
         configuration.userContentController = contentController
 
         let manager = TabManager(configuration: configuration)
@@ -62,13 +66,20 @@ final class BrowserWindowController: NSWindowController {
 
 
         let contentSize = Self.initialContentSize()
-        let window = NSWindow(
+        // Chromeless by default: the close, minimise and zoom buttons and the
+        // title bar they sit in are all gone, so the page starts at the top
+        // edge and the status line is the only furniture.
+        let chromeless = Config.windowChrome != "titled"
+        let style: NSWindow.StyleMask = chromeless
+            ? [.borderless, .miniaturizable, .resizable]
+            : [.titled, .closable, .miniaturizable, .resizable]
+        let window = BrowserWindow(
             contentRect: NSRect(origin: .zero, size: contentSize),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            styleMask: style,
             backing: .buffered,
             defer: false
         )
-        window.title = L("Vimb")
+        window.title = L("Vimba")
         window.contentMinSize = NSSize(width: 480, height: 320)
         // Without this, toggleFullScreen: silently does nothing and the green
         // button only zooms.
@@ -148,7 +159,7 @@ final class BrowserWindowController: NSWindowController {
         splitView.isVertical = true
         splitView.dividerStyle = .thin
 
-        for subview in [splitView, statusBar, commandBar, completions] as [NSView] {
+        for subview in [splitView, statusBar, commandBar, completions, keyGuide] as [NSView] {
             subview.translatesAutoresizingMaskIntoConstraints = false
             container.addSubview(subview)
         }
@@ -172,6 +183,12 @@ final class BrowserWindowController: NSWindowController {
             completions.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             completions.trailingAnchor.constraint(equalTo: container.trailingAnchor),
             completions.bottomAnchor.constraint(equalTo: commandBar.topAnchor),
+
+            // Sits where the completion list does, but above the status line:
+            // it only appears in normal mode, where the command bar is hidden.
+            keyGuide.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            keyGuide.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            keyGuide.bottomAnchor.constraint(equalTo: statusBar.topAnchor),
         ])
 
         return container
@@ -183,6 +200,7 @@ final class BrowserWindowController: NSWindowController {
             commands: self,
             tabs: self,
             panes: self,
+            guide: self,
             ownerWindow: window
         )
         input.onModeChange = { [weak self] _ in
@@ -247,7 +265,7 @@ final class BrowserWindowController: NSWindowController {
         let title = currentTab.title
         let position = (tabs.index(of: currentTab) ?? 0) + 1
         let suffix = tabs.tabs.count > 1 ? " (\(position)/\(tabs.tabs.count))" : ""
-        window?.title = (title.isEmpty ? L("Vimb") : title) + suffix
+        window?.title = (title.isEmpty ? L("vimba") : title) + suffix
     }
 
     private func refreshStatusLine() {
@@ -290,25 +308,54 @@ final class BrowserWindowController: NSWindowController {
         let clickableURL = Bundle.main.url(forResource: "clickable", withExtension: "js", subdirectory: "js")
         let clickableJS = clickableURL.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
 
+        let diagURL = Bundle.main.url(forResource: "diag", withExtension: "js", subdirectory: "js")
+        let diagJS = diagURL.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
+
         // Loaded second so its rules win over the vendored stylesheet.
         let themeURL = Bundle.main.url(forResource: "hints-theme", withExtension: "css", subdirectory: "js")
         let theme = themeURL.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
+
+        // Last, so anything in ~/.config/vimba/hints.css wins.
+        let userCSS = Settings.userHintCSS
 
         let source = """
         \(js)
         \(scrollJS)
         \(clickableJS)
+        \(diagJS)
         (function () {
+            // Kept on window so hints.js can adopt the same rules into the
+            // shadow root that holds the labels.
+            window.vimbaHintCSS = \(JSLiteral.string(css + "\n" + theme + "\n" + userCSS));
             var style = document.createElement('style');
-            style.textContent = \(JSLiteral.string(css + "\n" + theme));
+            style.textContent = window.vimbaHintCSS;
             (document.head || document.documentElement).appendChild(style);
+
+            // A subframe is invisible to the app until it says so: this is the
+            // only way to obtain a WKFrameInfo for it.
+            // Identifies this document, so the app can tell two handles to
+            // the same frame apart from two different frames.
+            window.vimbaFrameId = 'f' + Math.random().toString(36).slice(2)
+                + '-' + Date.now();
+
+            if (window !== window.top) {
+                // Read by the parent frame's hints.js, which then leaves this
+                // frame's elements to the copy running here.
+                window.vimbaFrameRegistered = true;
+                try {
+                    window.webkit.messageHandlers.\(FrameRegistry.messageName)
+                        .postMessage(String(location.href));
+                } catch (e) {}
+            }
         })();
         """
 
-        // Main frame only: hints.js walks same-origin subframes itself, so
-        // injecting per frame would create duplicate hint sets that the main
-        // frame's clear() cannot reach.
-        return WKUserScript(source: source, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+        // Injected into every frame. The main frame's hints.js walks
+        // same-origin subframes itself and nothing calls hints.init() in a
+        // subframe yet, so no duplicate hint sets arise; what this buys today
+        // is that each subframe registers itself, which is the prerequisite
+        // for hinting cross-origin content.
+        return WKUserScript(source: source, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
     }
 
     /// Builds the candidate list for the line as typed. Called once, on the
@@ -459,6 +506,8 @@ final class BrowserWindowController: NSWindowController {
             dumpCookies(matching: filter)
         case .evaluate(let script):
             report(script: script)
+        case .diagnose(let delay, let needle):
+            runDiagnostics(after: delay, needle: needle)
         case .openBookmarkInNewTab(let query):
             guard let match = resolveBookmark(query), let url = URL(string: match.url) else {
                 statusBar.leftText = L("No matching bookmark")
@@ -494,23 +543,23 @@ final class BrowserWindowController: NSWindowController {
 
 extension BrowserWindowController: BrowserActions, CommandActions, TabActions, PaneActions {
     func scrollBy(lines: Int) {
-        evaluate("vimbScroll.by(\(lines * Config.scrollStep));")
+        evaluate("vimbaScroll.by(\(lines * Config.scrollStep));")
     }
 
     func scrollBy(columns: Int) {
-        evaluate("vimbScroll.byX(\(columns * Config.scrollStep));")
+        evaluate("vimbaScroll.byX(\(columns * Config.scrollStep));")
     }
 
     func scrollBy(pages: Double) {
-        evaluate("vimbScroll.byPages(\(pages));")
+        evaluate("vimbaScroll.byPages(\(pages));")
     }
 
     func scrollToTop() {
-        evaluate("vimbScroll.toTop();")
+        evaluate("vimbaScroll.toTop();")
     }
 
     func scrollToBottom() {
-        evaluate("vimbScroll.toBottom();")
+        evaluate("vimbaScroll.toBottom();")
     }
 
     func goBack() {
@@ -530,7 +579,63 @@ extension BrowserWindowController: BrowserActions, CommandActions, TabActions, P
         commandBar.promptText = ":"
         statusBar.isHidden = true
         commandBar.activate(prefilled: prefilled)
+        history.reset()
         resetCompletion()
+    }
+
+    func recallPreviousCommand() {
+        guard case .command = barPurpose,
+              let line = history.previous(startingFrom: commandBar.text)
+        else {
+            return
+        }
+        commandBar.text = line
+        resetCompletion()
+    }
+
+    func recallNextCommand() {
+        guard case .command = barPurpose, let line = history.next() else { return }
+        commandBar.text = line
+        resetCompletion()
+    }
+
+    func showKeyGuide(_ entries: [KeyGuideEntry]) {
+        keyGuide.show(entries)
+    }
+
+    func hideKeyGuide() {
+        keyGuide.hide()
+    }
+
+    func yankURL() {
+        copyToClipboard(webView.url?.absoluteString)
+    }
+
+    /// The browser's equivalent of vim's relative path: everything after the
+    /// host, which is what identifies the page within a site.
+    func yankPath() {
+        guard let url = webView.url, var path = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        else {
+            copyToClipboard(nil)
+            return
+        }
+        path.scheme = nil
+        path.host = nil
+        path.port = nil
+        path.user = nil
+        path.password = nil
+        copyToClipboard(path.string)
+    }
+
+    private func copyToClipboard(_ text: String?) {
+        guard let text, !text.isEmpty else {
+            statusBar.leftText = L("No address to copy")
+            return
+        }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+        statusBar.leftText = L("Copied") + " " + text
     }
 
     func beginSearch(backwards: Bool) {
@@ -545,11 +650,18 @@ extension BrowserWindowController: BrowserActions, CommandActions, TabActions, P
         beginCommand(prefilled: "open \(webView.url?.absoluteString ?? "")")
     }
 
-    func submitCommand() {
-        let line = commandBar.text
+    func submitCommand(alternate: Bool) {
+        let typed = commandBar.text
         let purpose = barPurpose
+        // Search patterns have their own repeat, with n and N; keeping them
+        // out of the command history leaves it useful for addresses.
+        if case .command = purpose {
+            history.record(typed)
+        }
         dismissCommandBar()
         input?.enterMode(.normal)
+
+        let line = alternate ? CommandParser.swapTarget(typed) : typed
 
         switch purpose {
         case .command:
@@ -671,11 +783,18 @@ extension BrowserWindowController: BrowserActions, CommandActions, TabActions, P
             statusBar.leftText = L("Last pane stays open")
             return
         }
-        // The buffer survives; only the pane goes, as in vim.
+        // Unlike vim, the buffer goes with the pane. A window there is a view
+        // onto a file that still exists on disk; here the pane *is* the page,
+        // and a buffer no pane shows is a web view left running unseen.
         let pane = panes.remove(at: focusedIndex)
+        let closed = pane.tab
         pane.removeFromSuperview()
         equalizePanes()
         focusPane(at: min(focusedIndex, panes.count - 1))
+
+        if tabs.close(closed) {
+            repointPanes(after: closed)
+        }
     }
 
     func focusNextPane() {
@@ -720,7 +839,7 @@ extension BrowserWindowController: BrowserActions, CommandActions, TabActions, P
     }
 
     func followSelection() {
-        evaluate("if (window.vimbFollowSelection) { vimbFollowSelection(); }")
+        evaluate("if (window.vimbaFollowSelection) { vimbaFollowSelection(); }")
     }
 
     func findNext() {
@@ -734,7 +853,7 @@ extension BrowserWindowController: BrowserActions, CommandActions, TabActions, P
     }
 
     func blurPageFocus() {
-        evaluate("if (window.vimbReleaseFocus) { vimbReleaseFocus(); }")
+        evaluate("if (window.vimbaReleaseFocus) { vimbaReleaseFocus(); }")
     }
 
     /// Evaluates an expression in the page, writing the result or error to
@@ -751,6 +870,47 @@ extension BrowserWindowController: BrowserActions, CommandActions, TabActions, P
             FileHandle.standardError.write(Data("js> \(script)\n\(outcome)\n".utf8))
             self?.statusBar.leftText = outcome
         }
+    }
+
+    /// Runs diag.js and appends its report to ~/.config/vimba/diag.log.
+    ///
+    /// A log file rather than the status line: the report is far too long for
+    /// one line, and stderr is only visible when the app was started from a
+    /// terminal.
+    private func runDiagnostics(after delay: Double, needle: String) {
+        // `:diag trace` records every hint call and its result, which is the
+        // only way to see what each frame did to a keystroke.
+        if needle == "trace" || needle == "notrace" {
+            Diagnostics.traceHints = (needle == "trace")
+            Diagnostics.append("\n===== trace \(Diagnostics.traceHints ? "on" : "off") \(Date()) =====\n")
+            statusBar.leftText = "hint trace \(Diagnostics.traceHints ? "on" : "off")"
+            return
+        }
+        if delay > 0 {
+            statusBar.leftText = L("Diagnosing in") + " \(Int(delay))s"
+        }
+        let script = "vimbaDiagnose(\(JSLiteral.string(needle)))"
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self else { return }
+            webView.evaluateJavaScript(script) { [weak self] result, error in
+                let body: String
+                if let error {
+                    body = "error: \(error.localizedDescription)"
+                } else {
+                    body = String(describing: result ?? "undefined")
+                }
+                guard let self else { return }
+                let known = frames.subframes(of: webView)
+                let header = "frames reporting vimba scripts: \(known.count)\n"
+                    + known.map { " - \($0.url.prefix(110))" }.joined(separator: "\n")
+                appendDiagnostics(header + "\n" + body)
+            }
+        }
+    }
+
+    private func appendDiagnostics(_ body: String) {
+        Diagnostics.append("\n===== \(Date()) =====\n\(body)\n")
+        statusBar.leftText = L("Wrote") + " ~/.config/vimba/diag.log"
     }
 
     /// Writes matching cookies to stderr, with expiry, so session loss can be
@@ -812,6 +972,8 @@ extension BrowserWindowController: BrowserActions, CommandActions, TabActions, P
     }
 }
 
+
+extension BrowserWindowController: KeyGuideActions {}
 
 extension BrowserWindowController: WKUIDelegate {
     /// Without this, window.open() returns null and OAuth sign-in flows such
@@ -902,6 +1064,8 @@ extension BrowserWindowController: NSWindowDelegate {
 extension BrowserWindowController: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         statusMessage = nil
+        // The frames of the outgoing page are gone, and so are their handles.
+        frames.reset(webView)
         refreshStatusLine()
     }
 

@@ -1,4 +1,4 @@
-# v-imba
+# Vimba
 
 A keyboard-driven, modal web browser for macOS, built on Apple's WebKit.
 
@@ -24,10 +24,12 @@ which is what made this tractable.
 Requires Xcode and macOS 14+.
 
 ```sh
-make            # build build/Vimb.app
+make            # build build/Vimba.app
 make run        # build and run with console output attached
 make install    # copy to /Applications, launchable from Spotlight
-make config     # install the example keymap to ~/.config/vimb-mac/
+make config     # install the example keymap to ~/.config/vimba/
+make icon       # regenerate the app icon from Resources/icon-source.svg
+make uninstall  # remove the app, its saved state and preferences
 ```
 
 Release is the default configuration; add `CONFIG=debug` for a debug build.
@@ -70,10 +72,49 @@ Modes: **normal**, **insert**, **command**, **hint**, **pass-through**.
 | `Enter` | click whatever contains the selection |
 | `:` | command bar |
 | `o` `O` | command bar with `open ` / `open <current url>` |
+| `y` | copy the current address to the clipboard |
 | `gt` `gT` | next / previous buffer |
 | `Ctrl-z` | pass-through mode |
 | `Ctrl-=` `Ctrl--` `Ctrl-0` | zoom in / out / reset |
 | `Esc` | blur the page, release the scroll target, close dropdowns |
+
+`O` is how a mistyped address is corrected: it opens the command bar on the
+current URL rather than an empty line. `Ctrl-p` in the command bar walks back
+through what was submitted before, matching whatever is already typed, and
+`Ctrl-n` walks forward again — the history is kept in `~/.config/vimba/history`
+and survives restarts.
+
+### Leader bindings
+
+The leader is `<Space>`, and the `<leader>s…` namespace follows the kickstart
+Telescope layout, so the muscle memory carries over from nvim:
+
+| Keys | Opens |
+| --- | --- |
+| `<leader><leader>` | **[T]abs** — `n` new tab, `s` switch tab, `d` close tab |
+| `<leader>b` | **[B]ookmarks** — `o` open here, `n` open in new tab, `d` delete, `s` save this page |
+| `<leader>y` | **[Y]ank** — `f` full address, `r` path only |
+| `<leader>p` | **[P]ath** — `e` edit, `o` open here, `y` copy |
+
+Tabs sit on `<leader><leader>` because they are what a browser does most:
+double-tap the leader, then one key. Everything else is grouped by what it
+acts on, with the verbs constant throughout — `o` opens here, `n` opens in a
+new buffer, `d` deletes, `s` saves or switches. `<leader>yf` and `<leader>yr`
+mirror the full and relative path yanks in the nvim config: `yf` copies the
+whole address, `yr` only the path, query and fragment.
+
+Each one just opens the command bar prefilled, so Tab completion and fuzzy
+matching work exactly as when the command is typed by hand.
+
+Press `<Space>` and a which-key style panel lists what can follow it. Press a
+group key and it narrows. It appears with no delay, matching `delay = 0` in
+the nvim config, and `Esc` abandons a half-typed sequence without triggering
+anything. It covers every multi-key binding, so `g` and `Ctrl-w` are
+documented in place too.
+
+**Shift-Enter submits to the other target.** `<leader>sb` opens a bookmark in a
+new buffer on Enter and in the current one on Shift-Enter; the same swap turns
+`:open` into `:tabnew` and back.
 
 Arrow keys, `PgUp`/`PgDn`, `Home` and `End` are passed to the page even in
 normal mode, so native `<select>` popups stay navigable. Any key with `Cmd` goes
@@ -102,7 +143,16 @@ to the menu bar untouched.
 | `Esc` | cancel |
 
 The status line shows what you have typed, so hints vanishing behind a filter is
-visible rather than looking like a stuck mode.
+visible rather than looking like a stuck mode. A digit that would match no hint
+at all is ignored rather than clearing the screen, so a mistype costs nothing.
+
+Hints cover **every frame of the page, including cross-origin ones**. That is
+what makes Gmail's account menu or an embedded checkout form reachable: vimb's
+hints.js can only walk same-origin subframes, so anything else was invisible to
+it. The script runs in each frame instead and `HintController` coordinates
+them — it tells each frame which number to carry on labelling from, so labels
+stay unique across the whole page, and it makes sure a single frame holds the
+focused hint, since otherwise one Enter would click in several frames at once.
 
 ### Pass-through mode
 
@@ -123,6 +173,8 @@ unreachable.
 | `:tobm <query>` | `:tbm` | open a bookmark in a new buffer |
 | `:dbm <query>` | | delete a bookmark |
 | `:cookies [filter]` | | list stored cookies with expiry, to stderr |
+| `:diag [secs] [text]` | | write a hint-mode report to `~/.config/vimba/diag.log` |
+| `:diag trace` | | log every hint call and its result; `:diag notrace` stops |
 | `:quit` | `:q` | quit |
 
 `:open` resolves a target three ways: something with a scheme is used as-is,
@@ -154,7 +206,7 @@ Bookmarks are addressed like a filesystem:
 A path ending in `/` takes the page's host as its leaf, so `:sbm /social/` on
 Facebook stores `/social/facebook.com`.
 
-Stored as readable JSON at `~/.config/vimb-mac/bookmarks.json`.
+Stored as readable JSON at `~/.config/vimba/bookmarks.json`.
 
 ## Buffers and panes
 
@@ -171,19 +223,79 @@ panes at once, so one buffer cannot be shown twice.
 
 ## Configuration
 
-> Config and data live under `~/.config/vimb-mac/`, which predates the rename
-> to v-imba. Renaming the directory means moving existing bookmarks, so it has
-> been left alone for now.
+Everything lives under `~/.config/vimba/`:
 
+| File | Holds |
+| --- | --- |
+| `config.json` | settings — start page, search engine, hint keys, zoom, timeouts |
+| `keys.json` | bindings, the leader, and key-guide labels |
+| `hints.css` | extra CSS appended after the built-in hint styling |
+| `bookmarks.json` | bookmarks |
+| `history` | submitted command lines, for `Ctrl-p` |
+| `diag.log` | written by `:diag` |
 
-`~/.config/vimb-mac/keys.json` merges over the built-in defaults, so you only
-list what you want to change:
+`make config` writes `config.json` and `keys.json` from the example files
+without overwriting anything already there. Both are read at launch only.
+
+### Settings
+
+`config.json` overrides what used to be compile-time constants; every key is
+optional and falls back to the built-in value:
 
 ```json
 {
+  "start-page": "https://duckduckgo.com",
+  "search-engine": "https://duckduckgo.com/",
+  "window-chrome": "none",
+  "window-width": 1280,
+  "window-height": 800,
+  "scroll-step": 60,
+  "hint-keys": "0123456789",
+  "max-hints": 500,
+  "zoom-step": 1.1,
+  "zoom-min": 0.3,
+  "zoom-max": 5.0,
+  "content-languages": ["en-US", "en"],
+  "user-agent-suffix": "Version/18.0 Safari/605.1.15",
+  "tab-idle-minutes": 30
+}
+```
+
+The window has **no title bar** — no close, minimise or zoom buttons — so the
+page runs to the top edge and the status line is the only furniture. It still
+resizes from its edges and `⌘Q`, `⌘M` and `⌘W` still work, but with no title
+bar there is nothing left to drag it by. `"window-chrome": "titled"` puts the
+bar back.
+
+`hint-keys` takes letters as readily as digits — `"asdfghjkl"` gives
+Vimium-style home-row hints. The cost is that filtering hints by their text
+stops working, since that is what any key outside `hint-keys` does.
+
+`hints.css` is appended after the built-in stylesheet, so a rule there wins.
+Label styling is also adopted into the shadow root the labels live in:
+
+```css
+span[vimbahint^='label'] { background: #16e06a !important; font-size: 18px !important; }
+```
+
+
+### Keys
+
+`keys.json` merges over the built-in defaults, so you only list what you want
+to change. A value is either an action name, or `command:<text>` to open the
+command bar prefilled with that text, which is all a leader picker is. The
+object form adds the label the key guide shows. `leader` sets what `<leader>`
+stands for, and `groups` names the group rows in the guide:
+
+```json
+{
+  "leader": "<Space>",
+  "groups": { "<leader>s": "[S]earch", "<leader>b": "[B]uffer" },
   "normal": {
     "<C-d>": "half-page-down",
     "t": "command-open",
+    "y": "yank-url",
+    "<leader>sg": { "command": "open github.com/", "desc": "github" },
     "d": ""
   }
 }
@@ -201,7 +313,7 @@ half-page-down  half-page-up  scroll-top  scroll-bottom
 back  forward  reload
 zoom-in  zoom-out  zoom-reset
 insert-mode  hint-mode  passthrough-mode
-command-mode  command-open  command-open-current
+command-mode  command-open  command-open-current  yank-url
 search-forward  search-backward  search-next  search-previous
 follow-selection
 next-tab  previous-tab
@@ -215,18 +327,27 @@ hint mode is digits and filtering.
 
 The file is read at launch; there is no live reload yet.
 
-Other settings live in `Sources/vimbmac/Config.swift` — start page, search
-engine, scroll step, zoom range, hint keys, idle timeout, user agent.
+`Sources/vimba/Config.swift` holds the fallback for every setting, so the
+built-in behaviour is readable in one place.
 
 ## Debugging
 
 ```sh
-VIMB_DEBUG=1 ./build/Vimb.app/Contents/MacOS/Vimb
+VIMBA_DEBUG=1 ./build/Vimba.app/Contents/MacOS/Vimba
 ```
 
 Logs every keystroke with its mode, completion state, hint status and pane
 geometry to stderr. This found three real bugs during development, including a
 swallowed `NSException` that made working code look like it never ran.
+
+`:diag` exists because hint failures are invisible from the outside: a label
+that is present but unstyled looks exactly like a label that was never created,
+and an element in a cross-origin frame looks exactly like one the xpath missed.
+It creates a real hint set and reports the page's frames, how many elements the
+xpath matched, and the first label's computed style and geometry. `:diag 8 add
+account` waits 8 seconds first — long enough to open a menu — and then reports
+where that text lives. `:diag trace` logs every call made to every frame and
+what each answered, which is how the duplicate-frame bug was found.
 
 When testing anything about sessions or cookies, quit with **⌘Q**. Killing the
 app with `SIGTERM` stops WebKit flushing its cookie store, which looks exactly
@@ -240,13 +361,13 @@ keystroke while page content has focus, so nothing less gets first refusal.
 Each window filters on `event.window`, which is what lets the browser window,
 popups and panes coexist.
 
-`hints.js` and `hints.css` come from vimb and carry two changes, both marked
+`hints.js` and `hints.css` come from vimb and carry the changes marked
 `LOCAL CHANGE`:
 
 - `open()` dispatches a real click instead of assigning `location.href`.
   Assigning it forces a full page load, which stops a single-page app routing
   client-side — links appeared to merely reload the page.
-- The xpath also matches `data-vimbclick`, set by `clickable.js` on elements
+- The xpath also matches `data-vimbaclick`, set by `clickable.js` on elements
   whose only clue is `cursor: pointer`. Framework components attach handlers
   with `addEventListener` and so carry no `href`, `onclick`, `role` or
   `tabindex` for the original xpath to find.

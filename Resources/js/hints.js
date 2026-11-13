@@ -7,7 +7,7 @@ var hints = Object.freeze((function(){
         activeHint,        /* holds the active hint object */
         filterText = "",   /* holds the typed text filter */
         filterKeys = "",   /* holds the typed hint-keys filter */
-        attr = "vimbhint",
+        attr = "vimbahint",
         config;
     /* the hint class used to maintain hinted element and labels */
     function Hint() {
@@ -89,8 +89,8 @@ var hints = Object.freeze((function(){
         }
         for (i = 0; i < docs.length; i++) {
             doc = docs[i];
-            /* find all hinted elements vimbhint 'hint' */
-            var res = xpath(doc.doc, "//*[@vimbhint]");
+            /* find all hinted elements vimbahint 'hint' */
+            var res = xpath(doc.doc, "//*[@vimbahint]");
             for (j = 0; j < res.snapshotLength; j++) {
                 e = res.snapshotItem(j);
                 e.removeAttribute(attr);
@@ -102,6 +102,35 @@ var hints = Object.freeze((function(){
         validHints = [];
         filterText = "";
         filterKeys = "";
+    }
+
+    /* LOCAL CHANGE: puts the labels behind a shadow boundary, with our own
+     * stylesheet adopted into it. Falls back to appending them directly when
+     * shadow DOM or constructable stylesheets are unavailable. */
+    function attachLabels(doc, hDiv, fragment) {
+        var root = hDiv, sheet;
+        if (hDiv.attachShadow) {
+            try {
+                root = hDiv.attachShadow({mode: "open"});
+            } catch (ex) {
+                root = hDiv;
+            }
+        }
+        if (root !== hDiv && window.vimbaHintCSS) {
+            var css = ":host{all:initial}\n" + window.vimbaHintCSS;
+            /* A constructed stylesheet is not subject to the page's
+             * style-src policy, unlike a <style> element. */
+            try {
+                sheet = new CSSStyleSheet();
+                sheet.replaceSync(css);
+                root.adoptedStyleSheets = [sheet];
+            } catch (ex) {
+                var style = doc.createElement("style");
+                style.textContent = css;
+                root.appendChild(style);
+            }
+        }
+        root.appendChild(fragment);
     }
 
     function create() {
@@ -226,13 +255,32 @@ var hints = Object.freeze((function(){
             /* append the fragment to the document */
             var hDiv = doc.createElement("div");
             hDiv.setAttribute(attr, "container");
-            hDiv.style.position = "fixed";
-            hDiv.style.top      = "0";
-            hDiv.style.left     = "0";
-            hDiv.style.zIndex   = "2147483647";
-            hDiv.appendChild(fragment);
-            if (doc.body) {
-                doc.body.appendChild(hDiv);
+            /* LOCAL CHANGE: every declaration is inline and !important, which
+             * no page rule can outrank. Spotify left the labels with a zero
+             * rect - present, styled, and never laid out - because a page rule
+             * reached the container. */
+            [["position", "fixed"], ["top", "0"], ["left", "0"],
+             ["width", "0"], ["height", "0"], ["margin", "0"], ["padding", "0"],
+             ["display", "block"], ["visibility", "visible"], ["opacity", "1"],
+             ["transform", "none"], ["clip-path", "none"], ["contain", "none"],
+             ["content-visibility", "visible"], ["pointer-events", "none"],
+             ["z-index", "2147483647"]
+            ].forEach(function (d) {
+                hDiv.style.setProperty(d[0], d[1], "important");
+            });
+            /* LOCAL CHANGE: labels live in a shadow root rather than directly
+             * in the page. Page CSS reached them before and could restyle or
+             * displace them - an inherited text-indent, an icon font, or a
+             * rule matching body's own children all leave the hinted element
+             * highlighted with no readable number next to it. A shadow root
+             * blocks every page selector, and `all: initial` on the host stops
+             * inherited properties leaking in. */
+            attachLabels(doc, hDiv, fragment);
+            /* LOCAL CHANGE: documentElement rather than body - rules written
+             * against body's own children cannot match it there. */
+            var mount = doc.documentElement || doc.body;
+            if (mount) {
+                mount.appendChild(hDiv);
             }
             docs.push({
                 doc:   doc,
@@ -245,6 +293,15 @@ var hints = Object.freeze((function(){
             for (i = 0; i < win.frames.length; i++) {
                 try {
                     var rect, f = win.frames[i], e = f.frameElement;
+                    /* LOCAL CHANGE: a frame running its own copy of this
+                     * script hints itself, from a label range the app has
+                     * given it; hinting it from here too would number
+                     * everything in it twice. Reading the flag throws for a
+                     * cross-origin frame, which is exactly the case that has
+                     * to be left to the frame itself. */
+                    if (f.vimbaFrameRegistered) {
+                        continue;
+                    }
                 } catch (ex) {
                     continue;
                 }
@@ -480,7 +537,7 @@ var hints = Object.freeze((function(){
         }
         return frames;
     }
-    function _labeler(keys, sameLength) {
+    function _labeler(keys, sameLength, startAt) {
         var kl  = keys.length,
             /* Avoid don't consider the hint keys to be numeric in case the */
             /* hintKeys='0' to avoid endless loop by attempt to use next */
@@ -490,7 +547,9 @@ var hints = Object.freeze((function(){
 
         return function (count) {
             /* if hint keys starts with '0' count from 1 instead of 0 */
-            var hcount = num,
+            /* LOCAL CHANGE: startAt continues the numbering of an earlier
+             * frame, so labels stay unique across all frames of a page. */
+            var hcount = num + (startAt || 0),
                 offset = 0;
 
             function getMaxHintOfLen(len) {
@@ -540,14 +599,19 @@ var hints = Object.freeze((function(){
 
     /* the api */
     return {
-        init: function(mode, keepOpen, maxHints, hintKeys, followLast, keysSameLength) {
+        init: function(mode, keepOpen, maxHints, hintKeys, followLast, keysSameLength, startAt) {
+            /* LOCAL CHANGE: create() appends, so initialising twice over the
+             * same document would leave two sets of labels on one element. */
+            if (hints.length) {
+                clear(true);
+            }
             var prop,
                 /* holds the xpaths for the different modes */
                 xpathmap = {
-                    /* LOCAL CHANGE: data-vimbclick is added by clickable.js
+                    /* LOCAL CHANGE: data-vimbaclick is added by clickable.js
                      * for elements whose only clue is cursor: pointer, which is
                      * how framework components present themselves. */
-                    otY:     "//*[@href] | //*[@onclick or @tabindex or @class='lk' or @role='link' or @role='button' or @role='menuitem' or @role='tab' or @role='option'] | //*[@data-vimbclick] | //input[not(@type='hidden' or @disabled or @readonly)] | //textarea[not(@disabled or @readonly)] | //button | //select | //summary",
+                    otY:     "//*[@href] | //*[@onclick or @tabindex or @class='lk' or @role='link' or @role='button' or @role='menuitem' or @role='tab' or @role='option'] | //*[@data-vimbaclick] | //input[not(@type='hidden' or @disabled or @readonly)] | //textarea[not(@disabled or @readonly)] | //button | //select | //summary",
                     k:       "//div",
                     e:       "//input[not(@type) or @type='text'] | //textarea",
                     iI:      "//img[@src]",
@@ -571,7 +635,7 @@ var hints = Object.freeze((function(){
                 hintKeys:       hintKeys,
                 followLast:     followLast,
                 keysSameLength: keysSameLength,
-                getHintLabeler: _labeler(hintKeys, keysSameLength)
+                getHintLabeler: _labeler(hintKeys, keysSameLength, startAt || 0)
             };
 
             for (prop in xpathmap) {
@@ -622,5 +686,26 @@ var hints = Object.freeze((function(){
         clear: clear,
         fire:  fire,
         focus: focus,
+        /* LOCAL CHANGE: the three entry points the cross-frame coordinator
+         * needs. Every frame hints independently; the app decides which one
+         * owns the focused hint, because only that one may fire. */
+        count: function () {
+            return hints.length;
+        },
+        state: function () {
+            return JSON.stringify({
+                label: activeHint ? String(activeHint.num) : null,
+                src:   activeHint ? getSrc(activeHint.e) : "",
+                shown: validHints.length
+            });
+        },
+        deactivate: function () {
+            if (activeHint) {
+                activeHint.unfocus();
+                mouseEvent(activeHint.e, "mouseout");
+                activeHint = undefined;
+            }
+            return "";
+        },
     };
 })());
