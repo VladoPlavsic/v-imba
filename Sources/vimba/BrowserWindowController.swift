@@ -1017,6 +1017,18 @@ extension BrowserWindowController: WKUIDelegate {
         for navigationAction: WKNavigationAction,
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
+        // A bare target="_blank" or window.open() becomes a buffer in this
+        // window, where the modal bindings live. A page that asks for a sized
+        // window - a sign-in consent screen, a payment sheet - still gets a
+        // real one, because those are built expecting their own window and
+        // often close it themselves.
+        if Config.linksOpenInBuffer, !Self.wantsOwnWindow(windowFeatures) {
+            let tab = tabs.newTab(configuration: configuration)
+            show(tab)
+            saveSession()
+            return tab.webView
+        }
+
         let popup = PopupWindowController(configuration: configuration, features: windowFeatures)
         popup.webView.uiDelegate = self
         popup.onClose = { [weak self, weak popup] in
@@ -1027,10 +1039,25 @@ extension BrowserWindowController: WKUIDelegate {
         return popup.webView
     }
 
+    /// True when the page specified a size, which is what a window meant to
+    /// stand on its own does and a plain link never does.
+    private static func wantsOwnWindow(_ features: WKWindowFeatures) -> Bool {
+        features.width != nil || features.height != nil
+    }
+
     func webViewDidClose(_ webView: WKWebView) {
-        guard let popup = popups.first(where: { $0.webView === webView }) else { return }
-        popup.close()
-        popups.removeAll { $0 === popup }
+        if let popup = popups.first(where: { $0.webView === webView }) {
+            popup.close()
+            popups.removeAll { $0 === popup }
+            return
+        }
+        // A page can call window.close() on a window it opened; when that
+        // window is one of our buffers, close the buffer.
+        guard let tab = tabs.tabs.first(where: { $0.webView === webView }) else { return }
+        if tabs.close(tab) {
+            repointPanes(after: tab)
+            saveSession()
+        }
     }
 
     func webView(

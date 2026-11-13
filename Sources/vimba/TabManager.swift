@@ -31,9 +31,12 @@ final class TabManager {
         suspensionTask?.cancel()
     }
 
+    /// `configuration` is only passed when WebKit hands one over for a
+    /// window the page opened: the returned web view has to be built with
+    /// exactly that object or WebKit refuses it.
     @discardableResult
-    func newTab() -> Tab {
-        let tab = Tab(configuration: configuration)
+    func newTab(configuration override: WKWebViewConfiguration? = nil) -> Tab {
+        let tab = Tab(configuration: override ?? configuration)
         tab.onChange = { [weak self] changed in
             self?.onTabChanged?(changed)
         }

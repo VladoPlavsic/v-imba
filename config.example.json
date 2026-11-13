@@ -19,5 +19,6 @@
   "user-agent-suffix": "Version/18.0 Safari/605.1.15",
 
   "tab-idle-minutes": 30,
-  "restore-session": true
+  "restore-session": true,
+  "links-open-in-buffer": true
 }

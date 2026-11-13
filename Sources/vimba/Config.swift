@@ -40,6 +40,11 @@ enum Config {
         "user-agent-suffix", "Version/18.0 Safari/605.1.15"
     )
 
+    /// Whether a link that asks for a new window becomes a buffer here
+    /// instead. A page that asks for a *sized* window still gets a real one,
+    /// since that is how sign-in and payment sheets expect to be shown.
+    static let linksOpenInBuffer = Settings.bool("links-open-in-buffer", true)
+
     /// Whether the open buffers come back on the next run.
     static let restoreSession = Settings.bool("restore-session", true)
 

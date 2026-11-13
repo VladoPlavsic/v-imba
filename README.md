@@ -218,6 +218,13 @@ state survives switching, but any buffer not displayed in a pane is suspended
 after 30 minutes idle, and reloads when you return to it. `tab-idle-minutes`
 in `config.json` changes that, trading reload latency for memory.
 
+**Links that ask for a new window open as a buffer here**, not as a separate
+window, so the modal bindings keep working. A page that asks for a *sized*
+window — a sign-in consent screen, a payment sheet — still gets a real one,
+since those are built expecting their own window and often close it
+themselves; `window.close()` on a buffer closes the buffer.
+`"links-open-in-buffer": false` restores the old behaviour.
+
 **Buffers come back on the next run.** The addresses and names are kept in
 `~/.config/vimba/session.json`, rewritten whenever the list changes and once
 more on quit. Restored buffers arrive suspended, so a session of thirty costs
@@ -274,7 +281,8 @@ optional and falls back to the built-in value:
   "content-languages": ["en-US", "en"],
   "user-agent-suffix": "Version/18.0 Safari/605.1.15",
   "tab-idle-minutes": 30,
-  "restore-session": true
+  "restore-session": true,
+  "links-open-in-buffer": true
 }
 ```
 
