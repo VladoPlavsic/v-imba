@@ -79,7 +79,7 @@ final class TabManager {
         let cutoff = Date().addingTimeInterval(-Config.tabIdleTimeout)
         for tab in tabs where !(isVisible?(tab) ?? false) {
             if tab.lastAccessed < cutoff {
-                tab.suspend()
+                tab.suspendIfQuiet()
             }
         }
     }

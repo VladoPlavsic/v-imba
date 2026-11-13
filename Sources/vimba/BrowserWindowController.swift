@@ -38,6 +38,9 @@ final class BrowserWindowController: NSWindowController {
     private let hintsBridge = HintsBridge()
     private let frames = FrameRegistry.shared
     private let history = CommandHistory()
+    /// True when the window opened onto buffers from the last run, so
+    /// the start page is not loaded over them.
+    private(set) var restoredSession = false
     private var progressObservation: NSKeyValueObservation?
     private var loadingObservation: NSKeyValueObservation?
     /// Set on navigation failure and cleared on the next load, so a mistyped
@@ -61,7 +64,17 @@ final class BrowserWindowController: NSWindowController {
         configuration.userContentController = contentController
 
         let manager = TabManager(configuration: configuration)
-        let first = manager.newTab()
+        let session = SessionStore.load()
+        // Restored buffers arrive suspended, so a large session costs nothing
+        // until each one is actually looked at.
+        for entry in session.tabs {
+            guard let url = URL(string: entry.url) else { continue }
+            manager.newTab().restore(url: url, title: entry.title)
+        }
+        let restoredActive = manager.tabs.indices.contains(session.active)
+            ? manager.tabs[session.active] : manager.tabs.first
+        let first = restoredActive ?? manager.newTab()
+        self.restoredSession = !session.tabs.isEmpty
         self.webView = first.webView
 
 
@@ -92,7 +105,9 @@ final class BrowserWindowController: NSWindowController {
             self?.panes.contains { $0.tab === tab } ?? false
         }
         manager.onTabChanged = { [weak self] tab in
-            guard let self, tab === self.currentTab else { return }
+            guard let self else { return }
+            saveSession()
+            guard tab === self.currentTab else { return }
             self.updateWindowTitle()
             self.refreshStatusLine()
         }
@@ -251,6 +266,20 @@ final class BrowserWindowController: NSWindowController {
 
     /// Shows `tab` in the focused pane. If another pane already has it, the two
     /// panes trade buffers, since a web view cannot appear twice.
+    /// Records the open buffers for the next run. Cheap enough to do on every
+    /// change: a handful of addresses written atomically.
+    func saveSession() {
+        let entries = tabs.tabs.compactMap { tab -> SessionStore.Entry? in
+            guard let url = tab.url?.absoluteString, !url.isEmpty, !url.hasPrefix("about:")
+            else {
+                return nil
+            }
+            return SessionStore.Entry(url: url, title: tab.title)
+        }
+        let active = tabs.index(of: focusedPane.tab) ?? 0
+        SessionStore.save(entries, active: active)
+    }
+
     private func show(_ tab: Tab) {
         if let other = panes.firstIndex(where: { $0.tab === tab }) {
             guard other != focusedIndex else { return }
@@ -311,6 +340,9 @@ final class BrowserWindowController: NSWindowController {
         let diagURL = Bundle.main.url(forResource: "diag", withExtension: "js", subdirectory: "js")
         let diagJS = diagURL.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
 
+        let mediaURL = Bundle.main.url(forResource: "media", withExtension: "js", subdirectory: "js")
+        let mediaJS = mediaURL.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
+
         // Loaded second so its rules win over the vendored stylesheet.
         let themeURL = Bundle.main.url(forResource: "hints-theme", withExtension: "css", subdirectory: "js")
         let theme = themeURL.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
@@ -323,6 +355,7 @@ final class BrowserWindowController: NSWindowController {
         \(scrollJS)
         \(clickableJS)
         \(diagJS)
+        \(mediaJS)
         (function () {
             // Kept on window so hints.js can adopt the same rules into the
             // shadow root that holds the labels.

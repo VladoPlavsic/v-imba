@@ -8,7 +8,7 @@
 
   "scroll-step": 60,
 
-  "hint-keys": "0123456789",
+  "hint-keys": "asdfghjkl",
   "max-hints": 500,
 
   "zoom-step": 1.1,
@@ -18,5 +18,6 @@
   "content-languages": ["en-US", "en"],
   "user-agent-suffix": "Version/18.0 Safari/605.1.15",
 
-  "tab-idle-minutes": 30
+  "tab-idle-minutes": 30,
+  "restore-session": true
 }

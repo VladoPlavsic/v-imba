@@ -38,6 +38,10 @@ enum Settings {
         (values[key] as? NSNumber)?.doubleValue ?? fallback
     }
 
+    static func bool(_ key: String, _ fallback: Bool) -> Bool {
+        values[key] as? Bool ?? fallback
+    }
+
     static func strings(_ key: String, _ fallback: [String]) -> [String] {
         values[key] as? [String] ?? fallback
     }

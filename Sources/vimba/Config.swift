@@ -17,10 +17,11 @@ enum Config {
     /// Pixels moved by a single `j` or `k`.
     static let scrollStep = Settings.int("scroll-step", 60)
 
-    /// Characters used to label hints, matching vimb's SETTING_HINT_KEYS.
-    /// Letters can be used instead of digits, at the cost of filtering hints
-    /// by their text, which is what any non-hint key does.
-    static let hintKeys = Settings.string("hint-keys", "0123456789")
+    /// Characters used to label hints. The home row by default: a letter is
+    /// found by muscle memory where a digit needs looking down at. Any key
+    /// *not* in this set filters hints by their text instead, so the wider
+    /// this is, the shorter the labels and the less text filtering is left.
+    static let hintKeys = Settings.string("hint-keys", "asdfghjkl")
     static let maxHints = Settings.int("max-hints", 500)
 
     /// Multiplier applied per zoom step, and the range it is clamped to.
@@ -38,6 +39,9 @@ enum Config {
     static let userAgentSuffix = Settings.string(
         "user-agent-suffix", "Version/18.0 Safari/605.1.15"
     )
+
+    /// Whether the open buffers come back on the next run.
+    static let restoreSession = Settings.bool("restore-session", true)
 
     /// How long a background tab may sit idle before it is suspended.
     static let tabIdleTimeout = Settings.double("tab-idle-minutes", 30) * 60

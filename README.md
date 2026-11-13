@@ -215,7 +215,22 @@ Buffers are global and a pane shows one, exactly as in vim. `:b` switches the
 
 Buffers are named automatically from `title — url`. They stay live so their
 state survives switching, but any buffer not displayed in a pane is suspended
-after 30 minutes idle, and reloads when you return to it.
+after 30 minutes idle, and reloads when you return to it. `tab-idle-minutes`
+in `config.json` changes that, trading reload latency for memory.
+
+**Buffers come back on the next run.** The addresses and names are kept in
+`~/.config/vimba/session.json`, rewritten whenever the list changes and once
+more on quit. Restored buffers arrive suspended, so a session of thirty costs
+nothing until each is looked at — only the one you left focused loads at
+startup. `"restore-session": false` in `config.json` turns it off and goes
+back to opening the start page.
+
+**A buffer playing audio or video is never suspended.** Suspension navigates
+to `about:blank`, which would stop the music and lose its place, so every
+frame of an idle buffer is asked whether it is playing something audible
+first — WebKit only exposes `isPlayingAudio` to web extensions, not to an
+embedder, so the page is asked directly. Muted or silenced media does not
+count, and audio generated purely through the Web Audio API is not detected.
 
 Splitting shows a buffer that is not already on screen, or opens a new one at
 the current URL if every buffer is visible — a `WKWebView` cannot appear in two
@@ -232,6 +247,7 @@ Everything lives under `~/.config/vimba/`:
 | `hints.css` | extra CSS appended after the built-in hint styling |
 | `bookmarks.json` | bookmarks |
 | `history` | submitted command lines, for `Ctrl-p` |
+| `session.json` | the open buffers, reopened on the next run |
 | `diag.log` | written by `:diag` |
 
 `make config` writes `config.json` and `keys.json` from the example files
@@ -250,14 +266,15 @@ optional and falls back to the built-in value:
   "window-width": 1280,
   "window-height": 800,
   "scroll-step": 60,
-  "hint-keys": "0123456789",
+  "hint-keys": "asdfghjkl",
   "max-hints": 500,
   "zoom-step": 1.1,
   "zoom-min": 0.3,
   "zoom-max": 5.0,
   "content-languages": ["en-US", "en"],
   "user-agent-suffix": "Version/18.0 Safari/605.1.15",
-  "tab-idle-minutes": 30
+  "tab-idle-minutes": 30,
+  "restore-session": true
 }
 ```
 
@@ -267,9 +284,14 @@ resizes from its edges and `⌘Q`, `⌘M` and `⌘W` still work, but with no tit
 bar there is nothing left to drag it by. `"window-chrome": "titled"` puts the
 bar back.
 
-`hint-keys` takes letters as readily as digits — `"asdfghjkl"` gives
-Vimium-style home-row hints. The cost is that filtering hints by their text
-stops working, since that is what any key outside `hint-keys` does.
+`hint-keys` defaults to the home row, so hints read `a s d f g h j k l aa as
+…` and every one is under a finger. Widening it (`"asdfghjkl;qwertyuiop"`)
+shortens the labels on crowded pages; narrowing it lengthens them. Digits
+still work if you prefer them: `"0123456789"`.
+
+The trade is text filtering: any key *outside* `hint-keys` filters hints by
+their text, so with the home row taken, only the other 17 letters filter. With
+digits as hint keys, every letter filtered.
 
 `hints.css` is appended after the built-in stylesheet, so a rule there wins.
 Label styling is also adopted into the shadow root the labels live in:

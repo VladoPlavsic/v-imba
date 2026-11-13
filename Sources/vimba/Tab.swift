@@ -72,6 +72,14 @@ final class Tab {
         onChange = nil
     }
 
+    /// Restores a buffer from a saved session as if it had been suspended:
+    /// named and listed, but not loaded until it is first shown.
+    func restore(url: URL, title: String) {
+        suspendedURL = url
+        cachedTitle = title
+        isSuspended = true
+    }
+
     func load(_ url: URL) {
         isSuspended = false
         suspendedURL = nil
@@ -88,6 +96,43 @@ final class Tab {
 
     /// Drops the page to free its memory but keeps the tab and its name,
     /// remembering where to return to.
+    /// Suspends the tab unless it is playing something.
+    ///
+    /// Suspension navigates to about:blank, so a background tab playing music
+    /// would fall silent and lose its place. Every frame is asked, because the
+    /// player is often in a cross-origin iframe that the main frame cannot
+    /// see into.
+    func suspendIfQuiet() {
+        guard !isSuspended, let current = webView.url, current.scheme != "about" else { return }
+        let frames: [WKFrameInfo?] =
+            [nil] + FrameRegistry.shared.subframes(of: webView).map { $0.frame }
+        askIfPlaying(frames, from: 0) { [weak self] playing in
+            guard let self, !playing else { return }
+            suspend()
+        }
+    }
+
+    private func askIfPlaying(
+        _ frames: [WKFrameInfo?],
+        from index: Int,
+        then finish: @escaping (Bool) -> Void
+    ) {
+        guard index < frames.count else {
+            finish(false)
+            return
+        }
+        let script = "typeof vimbaIsPlayingMedia === 'function' ? vimbaIsPlayingMedia() : false"
+        webView.evaluateJavaScript(script, in: frames[index], in: .page) { [weak self] result in
+            guard let self else { return }
+            // A frame that has gone away cannot be playing anything.
+            if case .success(let value) = result, (value as? NSNumber)?.boolValue == true {
+                finish(true)
+                return
+            }
+            askIfPlaying(frames, from: index + 1, then: finish)
+        }
+    }
+
     func suspend() {
         guard !isSuspended, let current = webView.url, current.scheme != "about" else { return }
         suspendedURL = current
@@ -99,6 +144,11 @@ final class Tab {
     private func resume() {
         guard let target = suspendedURL else { return }
         suspendedURL = nil
+        // Without this the tab stays marked suspended for the rest of its
+        // life, so `url` keeps reading the address it no longer holds - which
+        // left resumed buffers out of the saved session and showed a stale
+        // name in the buffer list.
+        isSuspended = false
         webView.load(URLRequest(url: target))
         onChange?(self)
     }

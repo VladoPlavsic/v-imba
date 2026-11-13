@@ -7,7 +7,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let browser = BrowserWindowController()
         browser.showWindow(nil)
-        browser.load(Config.startPage)
+        // Buffers from the last run take precedence over the start page.
+        if !browser.restoredSession {
+            browser.load(Config.startPage)
+        }
         self.browser = browser
 
         // Activation before the run loop starts is too early to stick: there
@@ -20,5 +23,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
+    }
+
+    /// A last write on the way out, so a buffer opened seconds before quitting
+    /// is still there next time.
+    func applicationWillTerminate(_ notification: Notification) {
+        browser?.saveSession()
     }
 }
