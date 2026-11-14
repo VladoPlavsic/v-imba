@@ -38,6 +38,20 @@ final class Pane: NSView {
         fatalError("init(coder:) is not supported")
     }
 
+    /// Keeps the web view filling the pane.
+    ///
+    /// The guard matters: while the page is in element fullscreen the web view
+    /// has been moved into WebKit's own window, and forcing a frame on it
+    /// there is what leaves a black rectangle behind.
+    override func layout() {
+        super.layout()
+        guard tab.webView.superview === self else { return }
+        tab.webView.frame = bounds.insetBy(dx: Self.inset, dy: Self.inset)
+    }
+
+    /// Inset by the border width, so the focus ring stays visible.
+    private static let inset: CGFloat = 2
+
     func show(_ tab: Tab) {
         self.tab = tab
 
@@ -45,17 +59,19 @@ final class Pane: NSView {
             existing.removeFromSuperview()
         }
 
+        // Deliberately an autoresizing mask rather than constraints, even
+        // though the pane itself is constraint-based. Entering element
+        // fullscreen makes WebKit move this very web view into a full-screen
+        // window of its own; constraints pinned to this pane would follow it
+        // there, against a superview it no longer has, which shows up as a
+        // black frame with the audio still playing, and as an Auto Layout
+        // crash on the way back out. A mask simply stops applying once the
+        // view has a different parent.
         let web = tab.webView
-        web.translatesAutoresizingMaskIntoConstraints = false
+        web.translatesAutoresizingMaskIntoConstraints = true
+        web.frame = bounds.insetBy(dx: Self.inset, dy: Self.inset)
+        web.autoresizingMask = [.width, .height]
         addSubview(web)
-
-        // Inset by the border so the focus ring stays visible.
-        let inset: CGFloat = 2
-        NSLayoutConstraint.activate([
-            web.topAnchor.constraint(equalTo: topAnchor, constant: inset),
-            web.leadingAnchor.constraint(equalTo: leadingAnchor, constant: inset),
-            web.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -inset),
-            web.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -inset),
-        ])
+        needsLayout = true
     }
 }
